@@ -3,6 +3,7 @@
 // non-local database. Every demo name is marked "(prófun)".
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/auth/password";
+import { slugify } from "../src/lib/slug";
 
 const db = new PrismaClient();
 const PASSWORD = "profun-1234";
@@ -34,7 +35,7 @@ async function main() {
         emailVerifiedAt: new Date(),
         tradesperson: {
           create: {
-            slug: p.business.toLowerCase().replace(/[^a-z]+/g, "-").replace(/-+$/, ""),
+            slug: slugify(p.business),
             businessName: p.business,
             description: "Prófunaraðgangur til að skoða kerfið í þróun. Þetta er ekki raunverulegt fyrirtæki.",
             status: "APPROVED",
