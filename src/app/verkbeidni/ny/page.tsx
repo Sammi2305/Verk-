@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth/guards";
 import { todayInIceland } from "@/lib/format";
 import { getSettings } from "@/server/settings";
+import { uploadsEnabled } from "@/lib/runtime-config";
 import { JobRequestForm } from "@/components/forms/job-request-form";
 import { Card, CardSection, PageHeader } from "@/components/ui/primitives";
 import { UnverifiedBanner } from "@/components/unverified-banner";
@@ -40,6 +41,7 @@ export default async function NewRequestPage({ searchParams }: { searchParams: P
             areas={areas}
             maxInvites={settings.maxInvitesPerRequest}
             minDate={todayInIceland()}
+            photosEnabled={uploadsEnabled()}
             defaults={{ categoryId: category?.id, areaId: area?.id, preselectSlug: pro?.slug }}
           />
         </CardSection>

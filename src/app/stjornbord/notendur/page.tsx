@@ -2,7 +2,7 @@ import { t } from "@/i18n";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/guards";
 import { formatShortDate } from "@/lib/format";
-import { setUserStatusAction } from "../actions";
+import { setUserStatusAction, verifyEmailAction } from "../actions";
 import { Badge } from "@/components/ui/primitives";
 import { Input } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,20 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
             <Td>
               {u.email}
               {!u.emailVerifiedAt && <span className="block text-xs text-warning-700">{t("admin.emailUnverified")}</span>}
+              {!u.emailVerifiedAt && u.status === "ACTIVE" && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs font-medium text-brand-700">{t("admin.verifyEmail")}</summary>
+                  <div className="mt-2">
+                    <DecisionForm
+                      action={verifyEmailAction}
+                      hidden={{ userId: u.id }}
+                      buttonName="confirm"
+                      noteLabel={t("admin.verifyEmailNote")}
+                      buttons={[{ value: "1", label: t("admin.verifyEmail"), variant: "primary" }]}
+                    />
+                  </div>
+                </details>
+              )}
             </Td>
             <Td>
               <Badge tone={u.status === "ACTIVE" ? "success" : "danger"}>{t(`enums.userStatus.${u.status}`)}</Badge>

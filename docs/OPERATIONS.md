@@ -14,6 +14,29 @@
 
 Validated at startup in `src/lib/env.ts`. Secrets never reach client bundles (`server-only` imports).
 
+## Deploying on Vercel
+
+The repository is ready for Vercel. On every deploy, `npm run vercel-build` (`scripts/vercel-build.ts`):
+
+1. applies pending migrations (`prisma migrate deploy`, never destructive),
+2. runs the idempotent seed (categories, areas, prices, settings, first admin),
+3. builds the app.
+
+If no database is connected, the build **stops** with an explanation instead of publishing a site where every page shows "Eitthvað fór úrskeiðis".
+
+One-time setup in the Vercel dashboard:
+
+1. **Database:** Project → **Storage** → **Create Database** → **Neon** (Postgres, has a free plan) → connect it to the project for *Production* and *Preview*. This sets the database variables automatically (Neon's `DATABASE_URL`/`DATABASE_URL_UNPOOLED` or Supabase's `POSTGRES_PRISMA_URL`/`POSTGRES_URL_NON_POOLING` both work).
+2. **Environment variables** (Project → Settings → Environment Variables):
+   - `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` (at least 12 characters): the first administrator, created on the next deploy. You can remove them after the admin exists.
+   - `APP_URL` *(optional)*: your public address, e.g. `https://verkvangur.is`. Defaults to the Vercel production domain.
+3. **Redeploy:** Deployments → latest → ⋯ → Redeploy.
+
+Behaviour on Vercel until the related services are chosen:
+
+- **E-mail is not sent.** Pages say so honestly. An admin confirms e-mail addresses by hand at *Stjórnborð → Notendur* (or on a profile under review). This is audited, and requests waiting for verification are sent.
+- **Photo uploads are off.** Vercel's disk is read-only and not shared, so the request form shows a note instead of the photo picker. Enabling photos requires object storage (e.g. Vercel Blob or S3-compatible), which needs approval.
+
 ## Deployment checklist
 
 1. Node ≥ 20.18, PostgreSQL ≥ 14 (managed, with automated backups and point-in-time recovery).

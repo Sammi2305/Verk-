@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { t } from "@/i18n";
 import { UserError } from "@/lib/action";
 import { audit } from "@/lib/audit";
+import { submitDraftsForUser } from "./job-requests";
 
 // Every function here is called only from admin server actions, which check
 // the ADMIN role first. All changes are written to the audit log in the same
@@ -125,6 +126,24 @@ export async function setUserStatus(adminId: string, userId: string, status: Ext
     if (status === "SUSPENDED") await tx.session.deleteMany({ where: { userId } });
     await audit({ actorId: adminId, action: status === "SUSPENDED" ? "user.suspend" : "user.reactivate", entityType: "User", entityId: userId, metadata: { reason } }, tx);
   });
+}
+
+/**
+ * Confirms a user's e-mail address by hand (e.g. after a phone call), for use
+ * while real e-mail delivery is not live. Audited; sends any waiting drafts.
+ */
+export async function verifyEmailManually(adminId: string, userId: string, reason: string) {
+  if (reason.trim().length < 5) throw new UserError(t("errors.reasonRequired"));
+  const verified = await db.$transaction(async (tx) => {
+    const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
+    if (user.status === "DELETED") throw new UserError(t("errors.invalidTransition"));
+    if (user.emailVerifiedAt) return false;
+    await tx.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date() } });
+    await tx.emailToken.updateMany({ where: { userId, type: "VERIFY_EMAIL", usedAt: null }, data: { usedAt: new Date() } });
+    await audit({ actorId: adminId, action: "user.email_verify_manual", entityType: "User", entityId: userId, metadata: { reason } }, tx);
+    return true;
+  });
+  if (verified) await submitDraftsForUser(userId);
 }
 
 // ───────────────────────────── Overview ─────────────────────────────

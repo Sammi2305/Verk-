@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { db, makeCustomer, makePro, requestInput, resetDb } from "./helpers";
 import { acceptInvitation, confirmBooking, createJobRequest } from "@/server/job-requests";
 import { confirmCompletion, reportCompletion, scheduleBooking } from "@/server/bookings";
-import { adjustCharge, pricingSchema, setUserStatus, updatePricing } from "@/server/admin";
+import { adjustCharge, pricingSchema, setUserStatus, updatePricing, verifyEmailManually } from "@/server/admin";
 import { deleteAccount } from "@/server/account";
 import { reviewProfile } from "@/server/tradespeople";
 import { hashPassword } from "@/lib/auth/password";
@@ -70,6 +70,26 @@ describe("admin operations", () => {
     await expect(reviewProfile(admin.id, pro.profile.id, "REJECTED", null)).rejects.toThrow();
     await reviewProfile(admin.id, pro.profile.id, "REJECTED", "Vantar lýsingu á þjónustu");
     expect((await db.tradespersonProfile.findUniqueOrThrow({ where: { id: pro.profile.id } })).status).toBe("REJECTED");
+  });
+});
+
+describe("manual e-mail verification (while e-mail delivery is off)", () => {
+  it("requires a reason, verifies, sends waiting drafts and writes the audit log", async () => {
+    const admin = await makeAdmin();
+    const customer = await makeCustomer({ verified: false });
+    const pro = await makePro();
+    const draft = await createJobRequest({ id: customer.id, emailVerified: false }, requestInput(pro.category.id, pro.area.id, [pro.profile.id]), []);
+    expect(draft.status).toBe("DRAFT");
+
+    await expect(verifyEmailManually(admin.id, customer.id, "")).rejects.toThrow();
+    await verifyEmailManually(admin.id, customer.id, "Staðfest í símtali");
+    expect((await db.user.findUniqueOrThrow({ where: { id: customer.id } })).emailVerifiedAt).not.toBeNull();
+    expect((await db.jobRequest.findUniqueOrThrow({ where: { id: draft.id } })).status).toBe("SUBMITTED");
+    expect(await db.auditLog.count({ where: { action: "user.email_verify_manual", entityId: customer.id } })).toBe(1);
+
+    // Repeating it is harmless and does not log twice.
+    await verifyEmailManually(admin.id, customer.id, "Staðfest í símtali");
+    expect(await db.auditLog.count({ where: { action: "user.email_verify_manual", entityId: customer.id } })).toBe(1);
   });
 });
 

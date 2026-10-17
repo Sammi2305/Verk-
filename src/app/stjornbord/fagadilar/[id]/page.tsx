@@ -4,7 +4,7 @@ import { t } from "@/i18n";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/guards";
 import { formatDateTime, formatPhone } from "@/lib/format";
-import { reviewProfileAction, reviewQualificationAction } from "../../actions";
+import { reviewProfileAction, reviewQualificationAction, verifyEmailAction } from "../../actions";
 import { Alert, Badge, Card, CardSection, DetailRow, SectionTitle } from "@/components/ui/primitives";
 import { ProfileStatusBadge } from "@/components/status";
 import { DecisionForm } from "@/components/forms/admin-forms";
@@ -117,7 +117,18 @@ export default async function AdminProfileReviewPage({ params }: { params: Promi
         <Card className="self-start">
           <CardSection className="space-y-4">
             <SectionTitle>{t("admin.reviewTitle")}</SectionTitle>
-            {!p.user.emailVerifiedAt && <Alert tone="warning">{t("admin.cannotApproveUnverified")}</Alert>}
+            {!p.user.emailVerifiedAt && (
+              <>
+                <Alert tone="warning">{t("admin.cannotApproveUnverified")}</Alert>
+                <DecisionForm
+                  action={verifyEmailAction}
+                  hidden={{ userId: p.user.id }}
+                  buttonName="confirm"
+                  noteLabel={t("admin.verifyEmailNote")}
+                  buttons={[{ value: "1", label: t("admin.verifyEmail") }]}
+                />
+              </>
+            )}
             {p.status === "APPROVED" && (
               <Link href={`/fagfolk/${p.slug}`} className="block text-sm font-medium text-brand-700 hover:underline">
                 {t("pro.viewPublic")} →

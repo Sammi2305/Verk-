@@ -35,6 +35,10 @@ E-mails are **not sent** in development: they are captured in the database and
 shown at `/dev/postholf` (enabled with `ENABLE_DEV_OUTBOX=true`, never available
 in production). Use it to open verification and password-reset links.
 
+## Deploying
+
+Vercel works out of the box once a Postgres database is connected; migrations and the seed run on every deploy. Step-by-step: [docs/OPERATIONS.md → Deploying on Vercel](docs/OPERATIONS.md#deploying-on-vercel).
+
 ## Scripts
 
 | Command | What it does |
@@ -57,7 +61,7 @@ createdb verkfinn_test && createdb verkfinn_e2e
 cp .env.test.example .env.test && cp .env.e2e.example .env.e2e   # set the DB password
 npx dotenv -e .env.test -- prisma migrate deploy
 
-npm test            # 38 unit + integration tests against a real Postgres
+npm test            # 45 unit + integration tests against a real Postgres
 npm run test:e2e    # builds for production, runs the full milestone flow on desktop and a Pixel 7 viewport
 ```
 

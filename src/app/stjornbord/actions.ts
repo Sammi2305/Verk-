@@ -9,7 +9,7 @@ import { fieldErrorsFrom } from "@/lib/zod-errors";
 import { formDataToObject } from "@/lib/validation";
 import { reviewProfile, reviewQualification } from "@/server/tradespeople";
 import { resolveDispute } from "@/server/bookings";
-import { adjustCharge, categorySchema, pricingSchema, saveCategory, setAreaActive, setUserStatus, updatePricing } from "@/server/admin";
+import { adjustCharge, categorySchema, pricingSchema, saveCategory, setAreaActive, setUserStatus, updatePricing, verifyEmailManually } from "@/server/admin";
 
 // Admin-only. requireAdmin() returns 404 for everyone else.
 
@@ -91,4 +91,14 @@ export async function setUserStatusAction(_prev: ActionState, fd: FormData): Pro
   const userId = id.parse(fd.get("userId"));
   const status = z.enum(["ACTIVE", "SUSPENDED"]).parse(fd.get("status"));
   return guarded(() => setUserStatus(admin.id, userId, status, String(fd.get("note") ?? "")), ["/stjornbord/notendur"]);
+}
+
+export async function verifyEmailAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const admin = await requireAdmin();
+  const userId = id.parse(fd.get("userId"));
+  return guarded(
+    () => verifyEmailManually(admin.id, userId, String(fd.get("note") ?? "")),
+    ["/stjornbord/notendur", "/stjornbord/fagadilar"],
+    t("admin.verifyEmailDone"),
+  );
 }

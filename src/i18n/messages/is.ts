@@ -222,6 +222,9 @@ export const is = {
     goToLogin: "Fara á innskráningu",
     devOutboxNotice: "Prófunarhamur: tölvupóstar eru ekki sendir heldur vistaðir í prófunarpósthólfi.",
     devOutboxLink: "Opna prófunarpósthólf",
+    emailNotLiveTitle: "Tölvupóstur er ekki virkur ennþá",
+    emailNotLive: "Við sendum ekki tölvupóst eins og er. Starfsfólk Verkvangs staðfestir netföng handvirkt á meðan.",
+    accountCreated: "Aðgangurinn hefur verið stofnaður fyrir {email}. Netfangið verður staðfest áður en þú getur sent verkbeiðnir eða tekið við verkum.",
     loginRequired: "Skráðu þig inn til að halda áfram.",
   },
   errors: {
@@ -380,6 +383,7 @@ export const is = {
     photos: "Myndir",
     photosHint: "Allt að {max} myndir. Myndir hjálpa fagfólki að meta verkið rétt.",
     addPhotos: "Bæta við myndum",
+    photosUnavailable: "Myndaupphleðsla er ekki virk ennþá. Lýstu verkinu vel í textanum í staðinn.",
     removePhoto: "Fjarlægja mynd",
     area: "Sveitarfélag",
     chooseArea: "Veldu sveitarfélag",
@@ -709,6 +713,9 @@ export const is = {
     billingEnabled: "Innheimta",
     billingDisabledExplain:
       "Innheimta er óvirk. Gjöld eru skráð en enginn er rukkaður. Ekki er hægt að virkja innheimtu fyrr en greiðsluþjónusta hefur verið tengd og samþykkt.",
+    verifyEmail: "Staðfesta netfang handvirkt",
+    verifyEmailNote: "Hvernig var staðfest? (t.d. símtal við notanda)",
+    verifyEmailDone: "Netfang staðfest.",
     suspendUser: "Loka aðgangi",
     reactivateUser: "Opna aðgang",
     auditActor: "Gerandi",

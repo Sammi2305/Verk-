@@ -1,13 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { appUrl } from "@/lib/runtime-config";
 import { t } from "@/i18n";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 
-const appUrl = process.env.APP_URL ?? "http://localhost:3000";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(appUrl),
+  metadataBase: new URL(appUrl()),
   title: { default: `${t("site.name")} — ${t("site.tagline")}`, template: `%s | ${t("site.name")}` },
   description: t("site.description"),
   openGraph: { type: "website", locale: "is_IS", siteName: t("site.name") },

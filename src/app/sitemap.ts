@@ -1,3 +1,4 @@
+import { appUrl } from "@/lib/runtime-config";
 import type { MetadataRoute } from "next";
 import { db } from "@/lib/db";
 import { publicProfileWhere } from "@/server/tradespeople";
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
  * pages that actually have approved tradespeople, and approved profiles.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = process.env.APP_URL ?? "http://localhost:3000";
+  const base = appUrl();
   const [categories, combos, profiles] = await Promise.all([
     db.category.findMany({ where: { active: true }, select: { slug: true, updatedAt: true } }),
     db.tradespersonCategory.findMany({

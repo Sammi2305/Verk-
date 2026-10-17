@@ -40,12 +40,14 @@ export function JobRequestForm({
   defaults,
   maxInvites,
   minDate,
+  photosEnabled,
 }: {
   categories: Category[];
   areas: Area[];
   defaults: { categoryId?: string; areaId?: string; preselectSlug?: string };
   maxInvites: number;
   minDate: string;
+  photosEnabled: boolean;
 }) {
   const [state, dispatch, isPending] = useActionState(createJobRequestAction, initialActionState);
   const v = (state.values ?? {}) as Record<string, string | string[]>;
@@ -132,48 +134,52 @@ export function JobRequestForm({
         <Field label={t("request.description")} name="description" error={fe.description}>
           <Textarea name="description" rows={5} maxLength={5000} placeholder={t("request.descriptionPlaceholder")} defaultValue={str("description")} error={fe.description} required />
         </Field>
-        <div className="space-y-2">
-          <p className="text-sm font-medium">
-            {t("request.photos")} <span className="font-normal text-muted">({t("common.optional")})</span>
-          </p>
-          <p className="text-sm text-muted">{t("request.photosHint", { max: MAX_PHOTOS })}</p>
-          <div className="flex flex-wrap gap-3">
-            {photos.map((p, i) => (
-              <div key={p.url} className="relative size-24 overflow-hidden rounded-xl border border-line">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.url} alt="" className="size-full object-cover" />
-                <button
-                  type="button"
-                  onClick={() => setPhotos((prev) => prev.filter((_, j) => j !== i))}
-                  className="absolute top-1 right-1 grid size-7 place-items-center rounded-full bg-ink/70 text-white hover:bg-ink"
-                  aria-label={t("request.removePhoto")}
-                >
-                  <XIcon className="size-4" />
-                </button>
-              </div>
-            ))}
-            {photos.length < MAX_PHOTOS && (
-              <label className="grid size-24 cursor-pointer place-items-center rounded-xl border border-dashed border-line-strong text-muted transition-colors hover:border-brand-600 hover:text-brand-700">
-                <span className="flex flex-col items-center gap-1 text-xs">
-                  {processing ? <span className="size-5 animate-spin rounded-full border-2 border-current border-r-transparent" /> : <ImageIcon />}
-                  {t("request.addPhotos")}
-                </span>
-                <input
-                  type="file"
-                  name="photos"
-                  accept="image/jpeg,image/png,image/webp"
-                  multiple
-                  className="sr-only"
-                  onChange={(e) => {
-                    onFiles(e.target.files);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-            )}
+        {photosEnabled ? (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">
+              {t("request.photos")} <span className="font-normal text-muted">({t("common.optional")})</span>
+            </p>
+            <p className="text-sm text-muted">{t("request.photosHint", { max: MAX_PHOTOS })}</p>
+            <div className="flex flex-wrap gap-3">
+              {photos.map((p, i) => (
+                <div key={p.url} className="relative size-24 overflow-hidden rounded-xl border border-line">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.url} alt="" className="size-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setPhotos((prev) => prev.filter((_, j) => j !== i))}
+                    className="absolute top-1 right-1 grid size-7 place-items-center rounded-full bg-ink/70 text-white hover:bg-ink"
+                    aria-label={t("request.removePhoto")}
+                  >
+                    <XIcon className="size-4" />
+                  </button>
+                </div>
+              ))}
+              {photos.length < MAX_PHOTOS && (
+                <label className="grid size-24 cursor-pointer place-items-center rounded-xl border border-dashed border-line-strong text-muted transition-colors hover:border-brand-600 hover:text-brand-700">
+                  <span className="flex flex-col items-center gap-1 text-xs">
+                    {processing ? <span className="size-5 animate-spin rounded-full border-2 border-current border-r-transparent" /> : <ImageIcon />}
+                    {t("request.addPhotos")}
+                  </span>
+                  <input
+                    type="file"
+                    name="photos"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    className="sr-only"
+                    onChange={(e) => {
+                      onFiles(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+            {fe.photos && <p className="text-sm font-medium text-danger-700" role="alert">{fe.photos}</p>}
           </div>
-          {fe.photos && <p className="text-sm font-medium text-danger-700" role="alert">{fe.photos}</p>}
-        </div>
+        ) : (
+          <p className="text-sm text-muted">{t("request.photosUnavailable")}</p>
+        )}
       </Section>
 
       <Section n={2} title={t("request.stepWhere")}>

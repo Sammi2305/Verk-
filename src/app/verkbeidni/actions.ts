@@ -9,6 +9,7 @@ import { fieldErrorsFrom } from "@/lib/zod-errors";
 import { formDataToObject } from "@/lib/validation";
 import { checkImageBytes, MAX_PHOTOS_PER_REQUEST, MAX_UPLOAD_BYTES, removeImage, storeImage, type StoredImage } from "@/lib/storage";
 import { createJobRequest, jobRequestSchema } from "@/server/job-requests";
+import { uploadsEnabled } from "@/lib/runtime-config";
 
 export async function createJobRequestAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireUser("/verkbeidni/ny");
@@ -24,6 +25,7 @@ export async function createJobRequestAction(_prev: ActionState, formData: FormD
   if (!parsed.success) return { fieldErrors: fieldErrorsFrom(parsed.error), values };
 
   const files = formData.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0);
+  if (files.length > 0 && !uploadsEnabled()) return { fieldErrors: { photos: t("request.photosUnavailable") }, values };
   if (files.length > MAX_PHOTOS_PER_REQUEST) {
     return { fieldErrors: { photos: t("errors.tooManyPhotos", { max: MAX_PHOTOS_PER_REQUEST }) }, values };
   }

@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: 2026-10-15_
+_Last updated: 2026-10-17_
 
 ## Milestone 1 — first customer → tradesperson booking workflow: **done**
 
@@ -15,17 +15,24 @@ _Last updated: 2026-10-15_
 | The booking can be completed | E2E: start → report completion → customer confirms; integration: not completed or billable until the customer confirms |
 | The system records fee eligibility | E2E + integration: Basic → 990 kr. charge recorded (status "Skráð, ekki innheimt"); Pro, cancelled and dispute-cancelled → none; never charged twice |
 
-Test results at the time of writing: `npm test` 38/38 passed (unit + integration on real Postgres); `npm run test:e2e` 2/2 passed (production build; desktop and Pixel 7 viewports, including no horizontal scrolling). `npm run typecheck` and `npm run lint` are clean.
+Test results at the time of writing: `npm test` 45/45 passed (unit + integration on real Postgres); `npm run test:e2e` 2/2 passed (production build; desktop and Pixel 7 viewports, including no horizontal scrolling). `npm run typecheck` and `npm run lint` are clean.
 
 ## Also in place
 
 Admin dashboard (overview counts, profile and qualification review, bookings, disputes, charge waivers with reasons, categories, areas, prices and VAT, users and suspension, audit log); disputes end to end; booking messages (text); in-app notifications with e-mail (test-captured); account settings and self-service account deletion; SEO (metadata, canonical URLs, sitemap with only real pages, robots, JSON-LD, `noindex` on empty category and area pages); draft privacy policy and terms.
+
+## Deployment (Vercel)
+
+The repository deploys to Vercel once a Postgres database is connected (see OPERATIONS.md → "Deploying on Vercel"). This was verified with a local simulation of a Vercel deploy: build with only the Vercel integration's database variables, then a browser click-through of public pages, sign-up, admin login and manual e-mail verification, with no errors. Without a database, the build now stops with instructions instead of publishing a broken site.
+
+On Vercel, until providers are approved: **no e-mail is sent** (admins verify addresses by hand, audited) and **photo uploads are off** (no object storage yet).
 
 ## Not built yet (deliberately out of scope for milestone 1)
 
 | Area | What is missing |
 | --- | --- |
 | Reviews & trust | Verified reviews after completed bookings, moderation, rating filter in search, reporting suspicious profiles. |
+| Files | Object storage for photos (uploads are off on Vercel). |
 | Messaging | Photo attachments in messages; per-type notification preferences (there is one e-mail on/off switch). |
 | E-mail | Real delivery. Everything is captured as test e-mail (see OPERATIONS.md). **Needs your approval and a provider choice.** |
 | Billing | Pro subscriptions, invoices, payment collection, refunds through a provider, failed-payment handling. **Needs your approval** (see BILLING.md). |
