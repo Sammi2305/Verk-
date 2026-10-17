@@ -1,0 +1,625 @@
+// Verkvangur — database schema.
+// Conventions:
+//  * Money is stored as integer ISK (krónur have no subunit in practice).
+//  * All timestamps are UTC (`timestamptz`). Iceland is UTC+0 all year.
+//  * Table/column names are snake_case in Postgres, camelCase in Prisma.
+// See docs/DATABASE.md for the narrative description of each model.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────── Users & auth ─────────────────────────────
+
+enum Role {
+  CUSTOMER
+  TRADESPERSON
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+model User {
+  id              String     @id @default(cuid())
+  email           String     @unique // always stored lower-case
+  passwordHash    String     @map("password_hash")
+  name            String
+  phone           String? // normalised 7-digit Icelandic number
+  role            Role       @default(CUSTOMER)
+  status          UserStatus @default(ACTIVE)
+  emailVerifiedAt DateTime?  @map("email_verified_at") @db.Timestamptz(3)
+  emailNotifications Boolean @default(true) @map("email_notifications")
+  locale          String     @default("is")
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt       DateTime?  @map("deleted_at") @db.Timestamptz(3)
+
+  sessions      Session[]
+  tokens        EmailToken[]
+  tradesperson  TradespersonProfile?
+  jobRequests   JobRequest[]
+  bookingsAsCustomer Booking[] @relation("BookingCustomer")
+  bookingEvents BookingEvent[]
+  disputesOpened Dispute[]   @relation("DisputeOpenedBy")
+  disputesResolved Dispute[] @relation("DisputeResolvedBy")
+  notifications Notification[]
+  auditLogs     AuditLog[]
+  uploads       Upload[]
+  messages      Message[]
+  chargeAdjustments ChargeAdjustment[]
+  verifiedQualifications Qualification[] @relation("QualificationVerifier")
+  reviewedProfiles TradespersonProfile[] @relation("ProfileReviewer")
+
+  @@map("users")
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  // SHA-256 of the random token held in the cookie; the raw token is never stored.
+  tokenHash  String   @unique @map("token_hash")
+  userId     String   @map("user_id")
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(3)
+  lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  userAgent  String?  @map("user_agent")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+enum EmailTokenType {
+  VERIFY_EMAIL
+  PASSWORD_RESET
+}
+
+model EmailToken {
+  id        String         @id @default(cuid())
+  tokenHash String         @unique @map("token_hash")
+  type      EmailTokenType
+  userId    String         @map("user_id")
+  expiresAt DateTime       @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime?      @map("used_at") @db.Timestamptz(3)
+  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@map("email_tokens")
+}
+
+// Fixed-window rate limiter backed by Postgres so it works across instances.
+model RateLimit {
+  key         String   @id
+  windowStart DateTime @map("window_start") @db.Timestamptz(3)
+  count       Int
+
+  @@map("rate_limits")
+}
+
+// ─────────────────────────── Reference data ────────────────────────────
+
+model Category {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  nameIs          String   @map("name_is")
+  nameEn          String?  @map("name_en")
+  descriptionIs   String?  @map("description_is")
+  // True when Icelandic law requires a certified master/licence for the trade.
+  // Used to show the user that verification matters; it never fakes a badge.
+  licenseRelevant Boolean  @default(false) @map("license_relevant")
+  active          Boolean  @default(true)
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tradespeople TradespersonCategory[]
+  jobRequests  JobRequest[]
+  qualifications Qualification[]
+
+  @@map("categories")
+}
+
+// Service area, roughly a municipality. Launch scope: höfuðborgarsvæðið.
+model Area {
+  id        String  @id @default(cuid())
+  slug      String  @unique
+  name      String
+  region    String // e.g. "Höfuðborgarsvæðið"
+  active    Boolean @default(true)
+  sortOrder Int     @default(0) @map("sort_order")
+
+  tradespeople TradespersonArea[]
+  jobRequests  JobRequest[]
+
+  @@map("areas")
+}
+
+// ─────────────────────────── Tradespeople ──────────────────────────────
+
+enum ProfileStatus {
+  DRAFT          // registered, profile not yet submitted for review
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+model TradespersonProfile {
+  id               String        @id @default(cuid())
+  userId           String        @unique @map("user_id")
+  slug             String        @unique
+  businessName     String        @map("business_name")
+  // Business kennitala. Shown to admins only; used for verification.
+  companyId        String?       @map("company_id")
+  description      String        @default("")
+  publicPhone      String?       @map("public_phone")
+  yearsExperience  Int?          @map("years_experience")
+  status           ProfileStatus @default(DRAFT)
+  acceptingRequests Boolean      @default(true) @map("accepting_requests")
+  reviewNote       String?       @map("review_note") // admin → tradesperson
+  reviewedAt       DateTime?     @map("reviewed_at") @db.Timestamptz(3)
+  reviewedById     String?       @map("reviewed_by_id")
+  submittedAt      DateTime?     @map("submitted_at") @db.Timestamptz(3)
+  approvedAt       DateTime?     @map("approved_at") @db.Timestamptz(3)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  reviewedBy     User?                  @relation("ProfileReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  categories     TradespersonCategory[]
+  areas          TradespersonArea[]
+  qualifications Qualification[]
+  subscription   Subscription?
+  invitations    JobInvitation[]
+  bookings       Booking[]
+  charges        PlatformCharge[]
+
+  @@index([status])
+  @@map("tradesperson_profiles")
+}
+
+model TradespersonCategory {
+  profileId  String @map("profile_id")
+  categoryId String @map("category_id")
+  profile    TradespersonProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  category   Category            @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@id([profileId, categoryId])
+  @@index([categoryId])
+  @@map("tradesperson_categories")
+}
+
+model TradespersonArea {
+  profileId String @map("profile_id")
+  areaId    String @map("area_id")
+  profile   TradespersonProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  area      Area                @relation(fields: [areaId], references: [id], onDelete: Restrict)
+
+  @@id([profileId, areaId])
+  @@index([areaId])
+  @@map("tradesperson_areas")
+}
+
+enum QualificationType {
+  JOURNEYMAN // sveinsbréf
+  MASTER     // meistarabréf
+  LICENSE    // löggilding (t.d. rafverktaki)
+  INSURANCE  // ábyrgðartrygging
+  OTHER
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+model Qualification {
+  id           String             @id @default(cuid())
+  profileId    String             @map("profile_id")
+  categoryId   String?            @map("category_id")
+  type         QualificationType
+  title        String
+  issuer       String?
+  referenceNo  String?            @map("reference_no") // certificate number, admin-only
+  status       VerificationStatus @default(PENDING)
+  verifiedAt   DateTime?          @map("verified_at") @db.Timestamptz(3)
+  verifiedById String?            @map("verified_by_id")
+  adminNote    String?            @map("admin_note")
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  profile    TradespersonProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  category   Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  verifiedBy User?               @relation("QualificationVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+
+  @@index([profileId])
+  @@map("qualifications")
+}
+
+// ──────────────────────────── Billing config ───────────────────────────
+
+enum PlanCode {
+  BASIC
+  PRO
+}
+
+// Admin-configurable plan pricing. Seeded with the proposed launch prices.
+model Plan {
+  code            PlanCode @id
+  nameIs          String   @map("name_is")
+  monthlyPriceIsk Int      @map("monthly_price_isk")
+  perJobFeeIsk    Int      @map("per_job_fee_isk")
+  active          Boolean  @default(true)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+}
+
+model Subscription {
+  id          String             @id @default(cuid())
+  profileId   String             @unique @map("profile_id")
+  planCode    PlanCode           @default(BASIC) @map("plan_code")
+  status      SubscriptionStatus @default(ACTIVE)
+  startedAt   DateTime           @default(now()) @map("started_at") @db.Timestamptz(3)
+  updatedAt   DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  profile TradespersonProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  plan    Plan                @relation(fields: [planCode], references: [code])
+
+  @@map("subscriptions")
+}
+
+// Singleton row (id = 1) with platform-wide settings.
+model PlatformSettings {
+  id                 Int      @id @default(1)
+  vatRatePercent     Int      @default(24) @map("vat_rate_percent")
+  pricesIncludeVat   Boolean  @default(false) @map("prices_include_vat")
+  // Real billing stays off until a payment provider is configured AND an admin
+  // explicitly turns it on. While off, charges are only *recorded*.
+  billingEnabled     Boolean  @default(false) @map("billing_enabled")
+  maxInvitesPerRequest Int    @default(3) @map("max_invites_per_request")
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("platform_settings")
+}
+
+// ─────────────────────────── Requests & bookings ───────────────────────
+
+enum Urgency {
+  FLEXIBLE
+  WITHIN_WEEK
+  URGENT
+}
+
+enum JobRequestStatus {
+  DRAFT     // saved, not yet sent (e.g. e-mail not verified)
+  SUBMITTED // sent to invited tradespeople, awaiting/collecting responses
+  BOOKED    // customer confirmed one response → a Booking exists
+  CANCELLED
+}
+
+model JobRequest {
+  id             String           @id @default(cuid())
+  customerId     String           @map("customer_id")
+  categoryId     String           @map("category_id")
+  areaId         String           @map("area_id")
+  title          String
+  description    String
+  // Private: shown only to the customer, and to the booked tradesperson.
+  addressLine    String           @map("address_line")
+  postcode       String
+  preferredFrom  DateTime?        @map("preferred_from") @db.Date
+  preferredTo    DateTime?        @map("preferred_to") @db.Date
+  urgency        Urgency          @default(FLEXIBLE)
+  status         JobRequestStatus @default(DRAFT)
+  submittedAt    DateTime?        @map("submitted_at") @db.Timestamptz(3)
+  cancelledAt    DateTime?        @map("cancelled_at") @db.Timestamptz(3)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  customer    User            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  category    Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  area        Area            @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  invitations JobInvitation[]
+  photos      Upload[]
+  booking     Booking?
+
+  @@index([customerId, status])
+  @@map("job_requests")
+}
+
+enum InvitationStatus {
+  PENDING      // awaiting the tradesperson
+  ACCEPTED     // tradesperson accepted and gave price info
+  DECLINED     // tradesperson declined (never billable)
+  SELECTED     // customer chose this one → booking
+  NOT_SELECTED // customer chose someone else / cancelled the request
+}
+
+enum PriceType {
+  FIXED      // fast verð
+  ESTIMATE   // áætlað verð
+  HOURLY     // tímagjald
+  INSPECTION // verð eftir skoðun
+}
+
+// One job request may be sent to several tradespeople. Each answers here.
+model JobInvitation {
+  id             String           @id @default(cuid())
+  jobRequestId   String           @map("job_request_id")
+  profileId      String           @map("profile_id")
+  status         InvitationStatus @default(PENDING)
+  priceType      PriceType?       @map("price_type")
+  priceAmountIsk Int?             @map("price_amount_isk") // null for INSPECTION
+  priceNote      String?          @map("price_note")
+  proposedStart  DateTime?        @map("proposed_start") @db.Timestamptz(3)
+  proposedEnd    DateTime?        @map("proposed_end") @db.Timestamptz(3)
+  message        String?
+  declineReason  String?          @map("decline_reason")
+  respondedAt    DateTime?        @map("responded_at") @db.Timestamptz(3)
+  seenAt         DateTime?        @map("seen_at") @db.Timestamptz(3)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  jobRequest JobRequest          @relation(fields: [jobRequestId], references: [id], onDelete: Cascade)
+  profile    TradespersonProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  booking    Booking?
+
+  @@unique([jobRequestId, profileId])
+  @@index([profileId, status])
+  @@map("job_invitations")
+}
+
+enum BookingStatus {
+  ACCEPTED    // customer confirmed; time not yet fixed
+  SCHEDULED   // time fixed
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+enum BookingSource {
+  PLATFORM    // customer found the tradesperson through Verkvangur
+  INDEPENDENT // tradesperson's own customer, registered by them — never fee-bearing
+}
+
+model Booking {
+  id             String        @id @default(cuid())
+  jobRequestId   String?       @unique @map("job_request_id")
+  invitationId   String?       @unique @map("invitation_id")
+  customerId     String        @map("customer_id")
+  profileId      String        @map("profile_id")
+  source         BookingSource @default(PLATFORM)
+  status         BookingStatus @default(ACCEPTED)
+  priceType      PriceType     @map("price_type")
+  priceAmountIsk Int?          @map("price_amount_isk")
+  priceNote      String?       @map("price_note")
+  scheduledStart DateTime?     @map("scheduled_start") @db.Timestamptz(3)
+  scheduledEnd   DateTime?     @map("scheduled_end") @db.Timestamptz(3)
+  // Completion requires both sides: tradesperson reports, customer confirms.
+  completionReportedAt  DateTime? @map("completion_reported_at") @db.Timestamptz(3)
+  completionConfirmedAt DateTime? @map("completion_confirmed_at") @db.Timestamptz(3)
+  completedAt    DateTime?     @map("completed_at") @db.Timestamptz(3)
+  cancelledAt    DateTime?     @map("cancelled_at") @db.Timestamptz(3)
+  cancelledById  String?       @map("cancelled_by_id")
+  cancelReason   String?       @map("cancel_reason")
+  // Fee eligibility is decided once, server-side, when the booking completes.
+  feeEligible    Boolean?      @map("fee_eligible")
+  feeReason      String?       @map("fee_reason")
+  // Optimistic concurrency guard for state transitions.
+  version        Int           @default(0)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  jobRequest JobRequest?         @relation(fields: [jobRequestId], references: [id], onDelete: Restrict)
+  invitation JobInvitation?      @relation(fields: [invitationId], references: [id], onDelete: Restrict)
+  customer   User                @relation("BookingCustomer", fields: [customerId], references: [id], onDelete: Restrict)
+  profile    TradespersonProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  events     BookingEvent[]
+  disputes   Dispute[]
+  charge     PlatformCharge?
+  messages   Message[]
+
+  @@index([profileId, status])
+  @@index([customerId, status])
+  @@map("bookings")
+  // NOTE: a Postgres exclusion constraint (see migration
+  // `booking_no_overlap`) prevents overlapping SCHEDULED/IN_PROGRESS
+  // bookings for the same tradesperson. Prisma cannot express it.
+}
+
+model BookingEvent {
+  id         String         @id @default(cuid())
+  bookingId  String         @map("booking_id")
+  actorId    String?        @map("actor_id")
+  fromStatus BookingStatus? @map("from_status")
+  toStatus   BookingStatus  @map("to_status")
+  type       String // e.g. "scheduled", "completion_reported"
+  note       String?
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([bookingId, createdAt])
+  @@map("booking_events")
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  bookingId String   @map("booking_id")
+  senderId  String   @map("sender_id")
+  body      String
+  readAt    DateTime? @map("read_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  sender  User    @relation(fields: [senderId], references: [id], onDelete: Restrict)
+
+  @@index([bookingId, createdAt])
+  @@map("messages")
+}
+
+enum DisputeStatus {
+  OPEN
+  RESOLVED_COMPLETED // admin decided the job was completed
+  RESOLVED_CANCELLED // admin decided the job was not completed
+}
+
+model Dispute {
+  id           String        @id @default(cuid())
+  bookingId    String        @map("booking_id")
+  openedById   String        @map("opened_by_id")
+  reason       String
+  status       DisputeStatus @default(OPEN)
+  previousStatus BookingStatus @map("previous_status")
+  resolution   String?
+  resolvedById String?       @map("resolved_by_id")
+  resolvedAt   DateTime?     @map("resolved_at") @db.Timestamptz(3)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  booking    Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  openedBy   User    @relation("DisputeOpenedBy", fields: [openedById], references: [id], onDelete: Restrict)
+  resolvedBy User?   @relation("DisputeResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@map("disputes")
+}
+
+// ───────────────────────────── Charges ─────────────────────────────────
+
+enum ChargeStatus {
+  RECORDED // billing disabled: fee recorded, nobody is charged
+  INVOICED
+  PAID
+  WAIVED
+  REFUNDED
+}
+
+// The platform fee for one completed, fee-eligible booking. The unique
+// bookingId makes recording idempotent — a booking can never be charged twice.
+model PlatformCharge {
+  id           String       @id @default(cuid())
+  bookingId    String       @unique @map("booking_id")
+  profileId    String       @map("profile_id")
+  planCode     PlanCode     @map("plan_code")
+  amountIsk    Int          @map("amount_isk") // as configured at completion time
+  vatRatePercent Int        @map("vat_rate_percent")
+  amountIncludesVat Boolean @map("amount_includes_vat")
+  status       ChargeStatus @default(RECORDED)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  booking     Booking             @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  profile     TradespersonProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  adjustments ChargeAdjustment[]
+
+  @@index([profileId, status])
+  @@map("platform_charges")
+}
+
+model ChargeAdjustment {
+  id         String       @id @default(cuid())
+  chargeId   String       @map("charge_id")
+  adminId    String       @map("admin_id")
+  fromStatus ChargeStatus @map("from_status")
+  toStatus   ChargeStatus @map("to_status")
+  reason     String
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  charge PlatformCharge @relation(fields: [chargeId], references: [id], onDelete: Cascade)
+  admin  User           @relation(fields: [adminId], references: [id], onDelete: Restrict)
+
+  @@map("charge_adjustments")
+}
+
+// ─────────────────────── Files, notifications, audit ───────────────────
+
+model Upload {
+  id           String   @id @default(cuid())
+  ownerId      String   @map("owner_id")
+  jobRequestId String?  @map("job_request_id")
+  storageKey   String   @unique @map("storage_key")
+  mimeType     String   @map("mime_type")
+  sizeBytes    Int      @map("size_bytes")
+  width        Int
+  height       Int
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  owner      User        @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  jobRequest JobRequest? @relation(fields: [jobRequestId], references: [id], onDelete: Cascade)
+
+  @@index([jobRequestId])
+  @@map("uploads")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  type      String
+  title     String
+  body      String
+  href      String?
+  readAt    DateTime? @map("read_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+enum EmailStatus {
+  QUEUED
+  TEST_CAPTURED // development: captured locally, NOT delivered to anyone
+  SENT
+  FAILED
+}
+
+model EmailOutbox {
+  id        String      @id @default(cuid())
+  toEmail   String      @map("to_email")
+  subject   String
+  textBody  String      @map("text_body")
+  template  String
+  status    EmailStatus @default(QUEUED)
+  isTest    Boolean     @map("is_test")
+  error     String?
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  sentAt    DateTime?   @map("sent_at") @db.Timestamptz(3)
+
+  @@index([toEmail, createdAt])
+  @@map("email_outbox")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?  @map("actor_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

@@ -1,0 +1,48 @@
+{
+  "name": "verkvangur",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.18"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:seed:demo": "tsx prisma/seed-demo.ts",
+    "db:test:prepare": "dotenv -e .env.test -- prisma migrate deploy"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "next": "16.4.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "server-only": "0.0.1",
+    "sharp": "0.35.5",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@tailwindcss/postcss": "4.1.18",
+    "@types/node": "^22.18.0",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "dotenv": "16.6.1",
+    "dotenv-cli": "^8.0.0",
+    "eslint": "^9.35.0",
+    "eslint-config-next": "16.4.2",
+    "prisma": "6.19.3",
+    "tailwindcss": "4.1.18",
+    "tsx": "4.20.5",
+    "typescript": "5.9.3",
+    "vitest": "5.0.5"
+  }
+}
