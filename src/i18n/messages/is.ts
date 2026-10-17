@@ -4,9 +4,23 @@
 export const is = {
   site: {
     name: "Verkvangur",
-    tagline: "Fagfólk fyrir heimilið og fyrirtækið",
+    tagline: "Rétti fagmaðurinn. Rétta verkið.",
     description:
       "Finndu yfirfarið iðnaðarfólk á höfuðborgarsvæðinu, sendu verkbeiðni og bókaðu tíma — frítt og án bókunargjalda.",
+  },
+  a11y: {
+    mainNav: "Aðalvalmynd",
+    footerNav: "Fótur",
+    breadcrumbs: "Brauðmolar",
+    pagination: "Síður",
+    brandValues: "Gildin okkar",
+    home: "{name} — forsíða",
+    unread: "{label} ({count} ólesnar)",
+  },
+  brandValues: {
+    trust: "Traust",
+    simplicity: "Einfaldleiki",
+    professionalism: "Fagmennska",
   },
   nav: {
     findPros: "Finna fagfólk",

@@ -125,7 +125,7 @@ export default async function ProfilePage({ params }: Props) {
               {p.acceptingRequests ? (
                 <>
                   <p className="flex items-center gap-2 text-sm font-medium text-success-700">
-                    <span className="size-2 rounded-full bg-success-700" aria-hidden /> {t("profile.accepting")}
+                    <span className="size-2 rounded-full bg-success-500" aria-hidden /> {t("profile.accepting")}
                   </p>
                   {!isPreview && (
                     <ButtonLink href={requestHref} className="w-full" size="lg">

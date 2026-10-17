@@ -25,7 +25,7 @@ export async function CategoryView({ category, area, page }: { category: Categor
 
   return (
     <Container className="py-10 sm:py-14">
-      <nav aria-label="Brauðmolar" className="mb-4 text-sm text-muted">
+      <nav aria-label={t("a11y.breadcrumbs")} className="mb-4 text-sm text-muted">
         <Link href="/flokkar" className="hover:text-ink">
           {t("nav.categories")}
         </Link>

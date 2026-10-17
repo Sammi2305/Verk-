@@ -3,7 +3,7 @@ import { t } from "@/i18n";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { Container } from "@/components/ui/primitives";
-import { ButtonLink } from "@/components/ui/button";
+import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { Select } from "@/components/ui/field";
 import {
   ArrowRightIcon,
@@ -79,10 +79,7 @@ export default async function HomePage() {
                     ))}
                   </Select>
                 </div>
-                <button
-                  type="submit"
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-600 px-5 font-medium text-white shadow-sm transition-colors hover:bg-brand-700"
-                >
+                <button type="submit" className={buttonClass("accent", "md", "px-5")}>
                   <SearchIcon className="size-4.5" />
                   {t("home.searchButton")}
                 </button>
@@ -111,18 +108,21 @@ export default async function HomePage() {
               {t("home.allCategories")} <ArrowRightIcon className="size-4" />
             </Link>
           </div>
-          <ul className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
+          {/* Phones: compact one-column rows (long Icelandic compound words never break mid-word).
+              Larger screens: cards with descriptions. */}
+          <ul className="grid gap-2.5 sm:grid-cols-2 sm:gap-4 md:grid-cols-4">
             {popular.map((c) => (
               <li key={c.id} className="min-w-0">
                 <Link
                   href={`/flokkar/${c.slug}`}
-                  className="group flex h-full flex-col gap-3 rounded-(--radius-card) border border-line bg-surface p-4 shadow-(--shadow-card) transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-(--shadow-raised) sm:p-5"
+                  className="group flex h-full items-center gap-3 rounded-(--radius-card) border border-line bg-surface p-3.5 shadow-(--shadow-card) transition hover:border-brand-200 hover:shadow-(--shadow-raised) sm:flex-col sm:items-start sm:p-5 sm:hover:-translate-y-0.5"
                 >
-                  <span className="grid size-10 place-items-center rounded-xl bg-brand-50 text-brand-600 transition-colors group-hover:bg-brand-600 group-hover:text-white">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600 transition-colors group-hover:bg-brand-600 group-hover:text-white">
                     <WrenchIcon />
                   </span>
-                  <span className="font-medium break-words hyphens-auto text-ink">{c.nameIs}</span>
-                  {c.descriptionIs && <span className="line-clamp-2 text-sm text-muted">{c.descriptionIs}</span>}
+                  <span className="min-w-0 flex-1 font-medium break-words text-ink sm:flex-none">{c.nameIs}</span>
+                  {c.descriptionIs && <span className="hidden line-clamp-2 text-sm text-muted sm:block">{c.descriptionIs}</span>}
+                  <ArrowRightIcon className="size-4 shrink-0 text-muted sm:hidden" />
                 </Link>
               </li>
             ))}
@@ -186,13 +186,13 @@ export default async function HomePage() {
         <Container>
           <div className="grid gap-10 overflow-hidden rounded-3xl bg-brand-900 px-6 py-12 text-white sm:px-12 sm:py-14 lg:grid-cols-[1.2fr_1fr] lg:items-center">
             <div>
-              <p className="text-sm font-medium tracking-wide text-brand-200 uppercase">{t("home.prosEyebrow")}</p>
+              <p className="text-sm font-semibold tracking-wide text-accent-500 uppercase">{t("home.prosEyebrow")}</p>
               <h2 id="pros-heading" className="mt-3 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
                 {t("home.prosTitle")}
               </h2>
               <p className="mt-4 max-w-lg text-lg text-brand-100">{t("home.prosText")}</p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <ButtonLink href="/nyskraning/fagadili" size="lg" variant="light">
+                <ButtonLink href="/nyskraning/fagadili" size="lg" variant="accent">
                   {t("home.prosCta")}
                 </ButtonLink>
                 <ButtonLink href="/verdskra" size="lg" variant="onDark">
@@ -218,7 +218,7 @@ export default async function HomePage() {
 }
 
 function MapDot() {
-  return <span aria-hidden className="size-2 rounded-full bg-brand-500" />;
+  return <span aria-hidden className="size-2 rounded-full bg-accent-500" />;
 }
 
 /** Explains the four price types customers will see. Purely explanatory — no fake data. */

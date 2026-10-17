@@ -29,7 +29,7 @@ export function NoResults({ title, text, action }: { title?: string; text?: stri
 export function Pagination({ page, pageCount, hrefFor }: { page: number; pageCount: number; hrefFor: (p: number) => string }) {
   if (pageCount <= 1) return null;
   return (
-    <nav aria-label="Síður" className="mt-8 flex items-center justify-center gap-3">
+    <nav aria-label={t("a11y.pagination")} className="mt-8 flex items-center justify-center gap-3">
       {page > 1 && (
         <Link href={hrefFor(page - 1)} className={buttonClass("outline", "sm")}>
           {t("common.previous")}

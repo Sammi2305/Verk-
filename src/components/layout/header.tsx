@@ -26,7 +26,7 @@ export async function Header() {
       <Container className="flex h-16 items-center justify-between gap-4">
         <Logo />
 
-        <nav aria-label="Aðalvalmynd" className="hidden items-center gap-1 md:flex">
+        <nav aria-label={t("a11y.mainNav")} className="hidden items-center gap-1 md:flex">
           {publicLinks.map((l) => (
             <Link key={l.href} href={l.href} className="rounded-lg px-3 py-2 text-sm font-medium text-ink-soft hover:bg-subtle hover:text-ink">
               {l.label}
@@ -40,7 +40,7 @@ export async function Header() {
               <Link
                 href="/tilkynningar"
                 className="relative grid size-10 place-items-center rounded-xl text-ink-soft hover:bg-subtle"
-                aria-label={unread ? `${t("nav.notifications")} (${unread} ólesnar)` : t("nav.notifications")}
+                aria-label={unread ? t("a11y.unread", { label: t("nav.notifications"), count: unread }) : t("nav.notifications")}
               >
                 <BellIcon />
                 {unread > 0 && (
@@ -81,7 +81,7 @@ export async function Header() {
                   {t("nav.login")}
                 </Link>
               </span>
-              <Link href="/verkbeidni/ny" className={buttonClass("primary", "sm")}>
+              <Link href="/verkbeidni/ny" className={buttonClass("accent", "sm")}>
                 {t("nav.newRequest")}
               </Link>
               <details className="relative md:hidden">
