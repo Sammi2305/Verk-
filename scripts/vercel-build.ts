@@ -2,32 +2,56 @@
 //   1. apply pending database migrations (non-destructive: `migrate deploy`)
 //   2. run the idempotent seed (reference data + first admin, if configured)
 //   3. build the Next.js app
-// If no database is connected, the build stops with a clear message instead
-// of publishing a site where every page fails.
+// Each step is labelled, and a failure ends with a plain-language reason so
+// the end of the Vercel build log says what went wrong.
 import { execSync } from "node:child_process";
-import { databaseUrl, directDatabaseUrl } from "../src/lib/runtime-config";
+import { databaseUrl, databaseVariableNames, directDatabaseUrl } from "../src/lib/runtime-config";
 
-const runtime = databaseUrl();
-const direct = directDatabaseUrl();
-
-if (!runtime || !direct) {
-  console.error(`
-✖ No database is connected to this Vercel project.
-
-  Fix: Vercel dashboard → this project → Storage → Create Database →
-  Neon (Postgres) → connect it to the project (Production and Preview),
-  then redeploy. See docs/OPERATIONS.md → "Deploying on Vercel".
-`);
+function fail(step: string, why: string): never {
+  console.error(`\n✖ Build stopped at: ${step}\n\n${why}\n`);
   process.exit(1);
 }
 
-function run(cmd: string, url: string) {
-  execSync(cmd, { stdio: "inherit", env: { ...process.env, DATABASE_URL: url } });
+const runtime = databaseUrl();
+const direct = directDatabaseUrl();
+const names = databaseVariableNames();
+console.log(`Database variables found: ${names.length ? names.join(", ") : "(none)"}`);
+
+if (!runtime || !direct) {
+  fail(
+    "finding the database",
+    `  No database connection string was found.
+  Fix: Vercel → this project → Storage → connect your Postgres (Neon) database
+  to this project for Production AND Preview, then redeploy.
+  (Variables are read at build time, so they must exist for this environment.)`,
+  );
 }
 
-run("npx prisma migrate deploy", direct);
-run("npx tsx prisma/seed.ts", direct);
-if (!process.env.SEED_ADMIN_EMAIL) {
-  console.warn("⚠ SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD not set: no administrator account will be created.");
+function step(n: number, title: string, cmd: string, url: string, hint: string) {
+  console.log(`\n▶ Step ${n}/3: ${title}`);
+  try {
+    execSync(cmd, { stdio: "inherit", env: { ...process.env, DATABASE_URL: url } });
+  } catch {
+    fail(title, hint);
+  }
 }
-run("npx next build", runtime);
+
+step(
+  1,
+  "database migrations",
+  "npx prisma migrate deploy",
+  direct,
+  `  Could not create or update the database tables (see the Prisma error above).
+  Common causes: the database is paused or unreachable, the connection string
+  is wrong, or only a pooled connection is available. With Neon, make sure
+  DATABASE_URL_UNPOOLED is connected to this project.`,
+);
+step(
+  2,
+  "initial data (categories, prices, first admin)",
+  "npx tsx prisma/seed.ts",
+  direct,
+  "  Seeding failed (see the error above). The database tables were created.",
+);
+step(3, "building the website", "npx next build", runtime, "  The Next.js build failed (see the error above).");
+console.log("\n✔ Deploy build finished.");

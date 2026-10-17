@@ -19,29 +19,43 @@ async function main() {
   }
   await db.platformSettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
 
+  await seedAdmin();
+  console.log("Seed complete.");
+}
+
+/**
+ * Creates the first administrator from SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD.
+ * Problems only warn (they never fail a deploy); an existing admin is never changed.
+ */
+async function seedAdmin() {
   const email = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase();
   const password = process.env.SEED_ADMIN_PASSWORD;
-  if (email && password) {
-    if (password.length < 12) throw new Error("SEED_ADMIN_PASSWORD must be at least 12 characters");
-    const existing = await db.user.findUnique({ where: { email } });
-    if (!existing) {
-      await db.user.create({
-        data: {
-          email,
-          name: process.env.SEED_ADMIN_NAME || "Kerfisstjóri",
-          role: "ADMIN",
-          passwordHash: await hashPassword(password),
-          emailVerifiedAt: new Date(),
-        },
-      });
-      console.log(`Created administrator ${email}`);
-    } else {
-      console.log(`Administrator ${email} already exists — unchanged`);
-    }
-  } else {
+  if (!email || !password) {
     console.log("SEED_ADMIN_EMAIL/SEED_ADMIN_PASSWORD not set — no administrator created");
+    return;
   }
-  console.log("Seed complete.");
+  if (password.length < 12) {
+    console.warn("⚠ SEED_ADMIN_PASSWORD is shorter than 12 characters — no administrator created. Set a longer password and redeploy.");
+    return;
+  }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    console.warn(`⚠ SEED_ADMIN_EMAIL "${email}" is not a valid e-mail address — no administrator created.`);
+    return;
+  }
+  if (await db.user.findUnique({ where: { email } })) {
+    console.log(`Administrator ${email} already exists — unchanged`);
+    return;
+  }
+  await db.user.create({
+    data: {
+      email,
+      name: process.env.SEED_ADMIN_NAME || "Kerfisstjóri",
+      role: "ADMIN",
+      passwordHash: await hashPassword(password),
+      emailVerifiedAt: new Date(),
+    },
+  });
+  console.log(`Created administrator ${email}`);
 }
 
 main()
